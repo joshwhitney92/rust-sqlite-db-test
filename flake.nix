@@ -41,8 +41,8 @@
             # project-specific build inputs go here
             rustup
             sqlite
-            # openssl
-            # pkg-config
+            openssl
+            pkg-config
             # tailwindcss
 
             # {{{ Add these as needed
@@ -93,7 +93,7 @@
               echo $GREETING | cowsay | lolcat
 
               # Set the path where 'cargo install' installs packages
-              # export PATH=$PATH:''${CARGO_HOME:-~/.cargo}/bin
+              export PATH=$PATH:''${CARGO_HOME:-~/.cargo}/bin
 
               #alias ls=eza
               #alias ls="ls -alh --color=auto"
