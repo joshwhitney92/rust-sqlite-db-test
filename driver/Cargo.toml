@@ -5,3 +5,5 @@ edition = "2021"
 
 [dependencies]
 json-parser = { git = "https://github.com/Tarzan9192/rust-json-parser.git", branch = "main" }
+file-manager = { git = "https://github.com/Tarzan9192/rust-file-manager.git", branch = "main" }
+database = {path = "../database" }
