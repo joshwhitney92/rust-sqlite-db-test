@@ -1,5 +1,7 @@
 pub mod models;
 pub mod data_accessor;
+pub mod errors;
+pub mod repositories;
 
 pub fn add(left: u64, right: u64) -> u64 {
     left + right
