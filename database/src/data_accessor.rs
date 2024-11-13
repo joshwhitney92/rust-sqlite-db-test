@@ -41,7 +41,9 @@ pub async fn exec_query_async<T: QueryResult>(
 
 pub async fn get_remote_jobs() -> Result<Vec<RemoteJob>, Error> {
     let pool = sqlx::sqlite::SqlitePool::connect("sqlite:test.db").await?;
-    let remote_jobs: Vec<RemoteJob> = sqlx::query_as!(RemoteJob, "
+    let remote_jobs: Vec<RemoteJob> = sqlx::query_as!(
+        RemoteJob,
+        "
             SELECT 
              PKRemoteJobs as RemoteJobID,
              Name,
@@ -49,9 +51,10 @@ pub async fn get_remote_jobs() -> Result<Vec<RemoteJob>, Error> {
              FKCategory as Category
             FROM RemoteJobs
 
-        ")
-        .fetch_all(&pool)
-        .await?;
+        "
+    )
+    .fetch_all(&pool)
+    .await?;
 
     Ok(remote_jobs)
 }

@@ -3,7 +3,6 @@
 //     UserResult(User)
 // }
 
-
 pub trait QueryResult {}
 
 #[derive(Debug, sqlx::FromRow)]

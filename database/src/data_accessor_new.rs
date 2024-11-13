@@ -124,28 +124,28 @@ where
 //     fn get_f64(&self, column: &str) -> Result<f64, DatabaseError>;
 //     fn get_bool(&self, column: &str) -> Result<bool, DatabaseError>;
 // }
-// 
+//
 // impl<R: Row> RowExt for R {
 //     fn get_str(&self, column: &str) -> Result<String, DatabaseError> {
 //         self.try_get(column)
 //             .map_err(|e| DatabaseError::RowParsingError(e.to_string()))
 //     }
-// 
+//
 //     fn get_i32(&self, column: &str) -> Result<i32, DatabaseError> {
 //         self.try_get(column)
 //             .map_err(|e| DatabaseError::RowParsingError(e.to_string()))
 //     }
-// 
+//
 //     fn get_i64(&self, column: &str) -> Result<i64, DatabaseError> {
 //         self.try_get(column)
 //             .map_err(|e| DatabaseError::RowParsingError(e.to_string()))
 //     }
-// 
+//
 //     fn get_f64(&self, column: &str) -> Result<f64, DatabaseError> {
 //         self.try_get(column)
 //             .map_err(|e| DatabaseError::RowParsingError(e.to_string()))
 //     }
-// 
+//
 //     fn get_bool(&self, column: &str) -> Result<bool, DatabaseError> {
 //         self.try_get(column)
 //             .map_err(|e| DatabaseError::RowParsingError(e.to_string()))

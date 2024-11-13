@@ -1,10 +1,9 @@
-use data_accessor_new::{Database, DatabaseError, SqliteDatabase};
+use data_accessor_new::{Database, SqliteDatabase};
 use database::*;
-use json_parser::json::remote_jobs;
 use models::RemoteJob;
-use repositories::remote_jobs::{RemoteJobRepository, TRemoteJobRepository};
+use repositories::remote_jobs::RemoteJobRepository;
 use sqlx::FromRow;
-use std::{env::join_paths, error::Error};
+use std::error::Error;
 
 const DB_PATH: &str = "test.db";
 
@@ -33,8 +32,8 @@ async fn main() -> Result<(), Box<dyn Error>> {
         .map(|row| RemoteJob::from_row(&row))
         .collect::<Result<Vec<RemoteJob>, _>>()?;
 
-        // Print the jobs
-        remote_jobs.iter().for_each(|job| println!("{:?}", job));
+    // Print the jobs
+    remote_jobs.iter().for_each(|job| println!("{:?}", job));
 
     Ok(())
 }
