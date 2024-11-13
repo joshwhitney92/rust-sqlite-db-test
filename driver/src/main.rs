@@ -1,25 +1,40 @@
-use std::env::join_paths;
-
+use data_accessor_new::{Database, DatabaseError, SqliteDatabase};
 use database::*;
+use json_parser::json::remote_jobs;
 use models::RemoteJob;
 use repositories::remote_jobs::{RemoteJobRepository, TRemoteJobRepository};
+use sqlx::FromRow;
+use std::{env::join_paths, error::Error};
+
 const DB_PATH: &str = "test.db";
 
-fn main() {
+#[tokio::main(flavor = "current_thread")]
+async fn main() -> Result<(), Box<dyn Error>> {
     if let Ok(db_file) = file_manager::create_file(DB_PATH, false) {}
 
     let repo = RemoteJobRepository::new();
 
     // if let Ok(jobs) = database::data_accessor::get_remote_jobs_sync() {
-    match repo.GetRemoteJobs() {
-        Ok(jobs) => {
-            jobs.iter().for_each(|job| println!("{:?}", job));
-        },
-        Err(x) => {
-            println!("{:?}", x.to_string())
-        }
-    }
-    // if let Ok(jobs) = repo.GetRemoteJobs() {
-    //     jobs.iter().for_each(|job| println!("{:?}", job));
-    // }
+
+    let db: SqliteDatabase = Database::new(DB_PATH).await?;
+    let remote_jobs = db
+        .query(
+            "
+                SELECT 
+                 PKRemoteJobs as RemoteJobID,
+                 Name,
+                 Url,
+                 FKCategory as Category
+                FROM RemoteJobs
+        ",
+        )
+        .await?
+        .into_iter()
+        .map(|row| RemoteJob::from_row(&row))
+        .collect::<Result<Vec<RemoteJob>, _>>()?;
+
+        // Print the jobs
+        remote_jobs.iter().for_each(|job| println!("{:?}", job));
+
+    Ok(())
 }
