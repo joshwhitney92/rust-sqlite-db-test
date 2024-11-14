@@ -1,70 +1,159 @@
-use crate::errors::Error as DBError;
-use crate::models::{QueryResult, RemoteJob};
-use sqlx::sqlite::SqliteQueryResult;
-use sqlx::Error;
-use tokio::runtime::Runtime;
+use sqlx::{
+    Database as SqlxDatabase, Error as SqlxError, Executor, IntoArguments, Pool, Row, Transaction,
+};
+use std::error::Error;
+use std::fmt;
 
-/*
- * TODO: Try and make ths work!
-pub async fn exec_query_async<T: QueryResult>(
-    connection_string: &str,
-    query: &str,
-    result: &mut dyn QueryResult
-) -> Result<T, DBError> {
-    let pool = sqlx::sqlite::SqlitePool::connect("sqlite:test.db").await;
-    match pool {
-        Ok(connection_pool) => {
-            let _: Vec<&QueryResult> =
-            sqlx::query_as!(T, "SELECT * FROM RemoteJobs")
-                .fetch_all(&pool)
-                .await?;
-            // let query: SqliteQueryResult = sqlx::query(query)
-            //     .execute(&connection_pool)
-            //     .await
-            //     .unwrap();
+#[derive(Debug)]
+pub enum DatabaseError {
+    ConnectionError(String),
+    QueryError(String),
+    RowParsingError(String),
+}
 
-            //  let parsed: T = query.try_into();
-
-            // let result = sqlx::query_as_with(sql, arguments)
-            //     .fetch_all(connection_pool)
-            //     .await;
-
-            Ok(())
+impl fmt::Display for DatabaseError {
+    fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
+        match self {
+            DatabaseError::ConnectionError(msg) => write!(f, "Connection error: {}", msg),
+            DatabaseError::QueryError(msg) => write!(f, "Query error: {}", msg),
+            DatabaseError::RowParsingError(msg) => write!(f, "Row parsing error: {}", msg),
         }
-        Err(_) => Err(DBError::DatabaseError {
-            message: String::from("Error connecting to database"),
-            code: 1,
-        }),
     }
 }
-*/
 
-pub async fn get_remote_jobs() -> Result<Vec<RemoteJob>, Error> {
-    let pool = sqlx::sqlite::SqlitePool::connect("sqlite:test.db").await?;
-    let remote_jobs: Vec<RemoteJob> = sqlx::query_as!(
-        RemoteJob,
-        "
-            SELECT 
-             PKRemoteJobs as RemoteJobID,
-             Name,
-             Url,
-             FKCategory as Category
-            FROM RemoteJobs
+impl Error for DatabaseError {}
 
-        "
-    )
-    .fetch_all(&pool)
-    .await?;
-
-    Ok(remote_jobs)
+impl From<SqlxError> for DatabaseError {
+    fn from(error: SqlxError) -> Self {
+        DatabaseError::QueryError(error.to_string())
+    }
 }
 
-pub fn get_remote_jobs_sync() -> Result<Vec<RemoteJob>, Error> {
-    let rt = tokio::runtime::Builder::new_current_thread()
-        .enable_all()
-        .build()
-        .unwrap();
-
-    // Execute the future, blocking the current thread until completion
-    rt.block_on(async { get_remote_jobs().await })
+pub struct Database<DB: SqlxDatabase> {
+    pool: Pool<DB>,
 }
+
+impl<DB: SqlxDatabase> Database<DB>
+where
+    // Database type must implement SqlxDatabase
+    DB: SqlxDatabase,
+    // Pool reference can be used as an Executor.
+    for<'c> &'c Pool<DB>: Executor<'c, Database = DB>,
+    // Database connection can be used as a Executor.
+    for<'c> &'c mut DB::Connection: Executor<'c, Database = DB>,
+{
+    /// Creates a new Database instance
+    /// Takes a string slice that represents the connection string.
+    pub async fn new(connection_string: &str) -> Result<Self, DatabaseError> {
+        let pool = Pool::connect(connection_string)
+            .await
+            .map_err(|e| DatabaseError::ConnectionError(e.to_string()))?;
+
+        Ok(Database { pool })
+    }
+
+    /// Executes a query that returns a result set
+    pub async fn query<'a, T>(&self, query: &'a str) -> Result<Vec<T>, DatabaseError>
+    where
+        T: for<'r> sqlx::FromRow<'r, DB::Row>,
+        <DB as sqlx::Database>::Arguments<'a>: IntoArguments<'a, DB>,
+    {
+        Ok(sqlx::query(query)
+            .fetch_all(&self.pool)
+            .await?
+            .into_iter()
+            .map(|row| T::from_row(&row).map_err(|e| DatabaseError::RowParsingError(e.to_string())))
+            .collect::<Result<Vec<T>, _>>()?)
+    }
+
+    /// Executes a query that returns a single row
+    /// Returns None if no rows are found
+    pub async fn query_one<'a>(
+        &self,
+        query: &'a str,
+    ) -> Result<Option<<DB as SqlxDatabase>::Row>, DatabaseError>
+    where
+        <DB as sqlx::Database>::Arguments<'a>: IntoArguments<'a, DB>,
+    {
+        Ok(sqlx::query(query).fetch_optional(&self.pool).await?)
+    }
+
+    /// Executes a query that doesn't return a result set
+    /// Returns the number of rows affected
+    pub async fn execute<'a>(&self, query: &'a str) -> Result<DB::QueryResult, DatabaseError>
+    where
+        <DB as sqlx::Database>::Arguments<'a>: IntoArguments<'a, DB>,
+    {
+        let result = sqlx::query(query).execute(&self.pool).await?;
+
+        Ok(result)
+    }
+
+    /// Executes a transaction with multiple queries
+    /// Rolls back if any query fails
+    pub async fn transaction<F, R>(&self, f: F) -> Result<R, DatabaseError>
+    where
+        F: for<'t> FnOnce(
+            &'t Transaction<'t, DB>,
+        ) -> futures::future::BoxFuture<'t, Result<R, DatabaseError>>,
+    {
+        let transaction = self.pool.begin().await?;
+
+        match f(&transaction).await {
+            Ok(result) => {
+                transaction.commit().await?;
+                Ok(result)
+            }
+            Err(e) => {
+                transaction.rollback().await?;
+                Err(e)
+            }
+        }
+    }
+
+    /// Returns a reference to the underlying connection pool
+    pub fn pool(&self) -> &Pool<DB> {
+        &self.pool
+    }
+}
+
+// // Helper trait to convert row values to various types
+// pub trait RowExt {
+//     fn get_str(&self, column: &str) -> Result<String, DatabaseError>;
+//     fn get_i32(&self, column: &str) -> Result<i32, DatabaseError>;
+//     fn get_i64(&self, column: &str) -> Result<i64, DatabaseError>;
+//     fn get_f64(&self, column: &str) -> Result<f64, DatabaseError>;
+//     fn get_bool(&self, column: &str) -> Result<bool, DatabaseError>;
+// }
+//
+// impl<R: Row> RowExt for R {
+//     fn get_str(&self, column: &str) -> Result<String, DatabaseError> {
+//         self.try_get(column)
+//             .map_err(|e| DatabaseError::RowParsingError(e.to_string()))
+//     }
+//
+//     fn get_i32(&self, column: &str) -> Result<i32, DatabaseError> {
+//         self.try_get(column)
+//             .map_err(|e| DatabaseError::RowParsingError(e.to_string()))
+//     }
+//
+//     fn get_i64(&self, column: &str) -> Result<i64, DatabaseError> {
+//         self.try_get(column)
+//             .map_err(|e| DatabaseError::RowParsingError(e.to_string()))
+//     }
+//
+//     fn get_f64(&self, column: &str) -> Result<f64, DatabaseError> {
+//         self.try_get(column)
+//             .map_err(|e| DatabaseError::RowParsingError(e.to_string()))
+//     }
+//
+//     fn get_bool(&self, column: &str) -> Result<bool, DatabaseError> {
+//         self.try_get(column)
+//             .map_err(|e| DatabaseError::RowParsingError(e.to_string()))
+//     }
+// }
+
+// Type aliases for common database types
+// pub type PostgresDatabase = Database<sqlx::Postgres>;
+// pub type MySqlDatabase = Database<sqlx::MySql>;
+pub type SqliteDatabase = Database<sqlx::Sqlite>;

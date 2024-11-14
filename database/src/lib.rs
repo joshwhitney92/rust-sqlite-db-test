@@ -1,5 +1,4 @@
 pub mod data_accessor;
-pub mod data_accessor_new;
 pub mod errors;
 pub mod models;
 pub mod repositories;
