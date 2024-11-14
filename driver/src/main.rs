@@ -11,25 +11,26 @@ const DB_PATH: &str = "test.db";
 async fn main() -> Result<(), Box<dyn Error>> {
     if let Ok(_) = file_manager::create_file(DB_PATH, false) {}
 
-    let db: SqliteDatabase = Database::new(DB_PATH).await?;
-    let remote_jobs: Vec<RemoteJob>  = db
-        .query(
-            "
+    // TODO: Move this query to it's own file.
+    let db_query = r#"
                 SELECT 
                  PKRemoteJobs as RemoteJobID,
                  Name,
                  Url,
                  FKCategory as Category
                 FROM RemoteJobs
-        ",
-        ).await?;
-        // .await?
-        // .into_iter()
-        // .map(|row| RemoteJob::from_row(&row))
-        // .collect::<Result<Vec<RemoteJob>, _>>()?;
+    "#;
+
+    let db: SqliteDatabase = Database::new(DB_PATH).await?;
+    let remote_jobs: Vec<RemoteJob> = db.query(db_query).await?;
 
     // Print the jobs
     remote_jobs.iter().for_each(|job| println!("{:?}", job));
+
+    // Print a single job
+    println!("\rHere is a single job:");
+    let single_job: Option<RemoteJob> = db.query_one(db_query).await?;
+    single_job.iter().for_each(|job| println!("{:?}", job));
 
     Ok(())
 }

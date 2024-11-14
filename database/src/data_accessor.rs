@@ -1,5 +1,5 @@
 use sqlx::{
-    Database as SqlxDatabase, Error as SqlxError, Executor, IntoArguments, Pool, Row, Transaction,
+    Database as SqlxDatabase, Error as SqlxError, Executor, IntoArguments, Pool, Transaction,
 };
 use std::error::Error;
 use std::fmt;
@@ -52,7 +52,7 @@ where
         Ok(Database { pool })
     }
 
-    /// Executes a query that returns a result set
+    /// Executes a query that returns a vector of the parsed results.
     pub async fn query<'a, T>(&self, query: &'a str) -> Result<Vec<T>, DatabaseError>
     where
         T: for<'r> sqlx::FromRow<'r, DB::Row>,
@@ -68,14 +68,19 @@ where
 
     /// Executes a query that returns a single row
     /// Returns None if no rows are found
-    pub async fn query_one<'a>(
-        &self,
-        query: &'a str,
-    ) -> Result<Option<<DB as SqlxDatabase>::Row>, DatabaseError>
+    pub async fn query_one<'a, T>(&self, query: &'a str) -> Result<Option<T>, DatabaseError>
     where
+        T: for<'r> sqlx::FromRow<'r, DB::Row>,
         <DB as sqlx::Database>::Arguments<'a>: IntoArguments<'a, DB>,
     {
-        Ok(sqlx::query(query).fetch_optional(&self.pool).await?)
+        Ok(sqlx::query(query)
+            .fetch_optional(&self.pool)
+            .await?
+            .and_then(|row| {
+                T::from_row(&row)
+                    .map_err(|e| DatabaseError::RowParsingError(e.to_string()))
+                    .ok()
+            }))
     }
 
     /// Executes a query that doesn't return a result set
