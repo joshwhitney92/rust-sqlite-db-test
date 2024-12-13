@@ -1,16 +1,11 @@
 use crate::errors::Error as DBError;
+use crate::interface::remote_job_data_accessor::RemoteJobDataAccessor;
 use crate::models::RemoteJob;
-
-pub trait TRemoteJobRepository {
-    fn GetRemoteJobs(&self) -> Result<Vec<RemoteJob>, DBError>;
-    fn GetReomteJobByName(&self) -> Result<Vec<RemoteJob>, DBError>;
-    fn InsertRemoteJob(&self, remote_job: RemoteJob);
-}
 
 pub struct RemoteJobRepository {}
 
-impl TRemoteJobRepository for RemoteJobRepository {
-    fn GetRemoteJobs(&self) -> Result<Vec<RemoteJob>, DBError> {
+impl RemoteJobDataAccessor for RemoteJobRepository {
+    async fn GetRemoteJobs(&self) -> Result<Vec<RemoteJob>, DBError> {
         let rt = tokio::runtime::Builder::new_current_thread()
             .enable_all()
             .build()
@@ -57,11 +52,11 @@ impl TRemoteJobRepository for RemoteJobRepository {
         }
     }
 
-    fn GetReomteJobByName(&self) -> Result<Vec<RemoteJob>, DBError> {
+    async fn GetReomteJobByName(&self) -> Result<Vec<RemoteJob>, DBError> {
         todo!()
     }
 
-    fn InsertRemoteJob(&self, remote_job: RemoteJob) {
+    async fn InsertRemoteJob(&self, remote_job: RemoteJob) {
         todo!()
     }
 }

@@ -1,8 +1,8 @@
 use data_accessor::{Database, SqliteDatabase};
 use database::*;
+use interface::remote_job_data_accessor::RemoteJobDataAccessor;
 use models::RemoteJob;
 use repositories::remote_jobs::RemoteJobRepository;
-use sqlx::FromRow;
 use std::error::Error;
 
 const DB_PATH: &str = "test.db";
@@ -11,6 +11,19 @@ const DB_PATH: &str = "test.db";
 async fn main() -> Result<(), Box<dyn Error>> {
     if let Ok(_) = file_manager::create_file(DB_PATH, false) {}
 
+    // Use the Repo
+    println!("Using the Repo pattern");
+    let repo = RemoteJobRepository::new();
+    match repo.GetRemoteJobs().await {
+        Ok(jobs) => {
+            jobs.iter().map(|job| println!("{:?}", job));
+        }
+        Err(e) => {
+            println!("Error: {:?}", e.to_string());
+        }
+    }
+
+    println!("Using the Database abstraction");
     // TODO: Move this query to it's own file.
     let db_query = r#"
                 SELECT 

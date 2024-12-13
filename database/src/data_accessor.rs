@@ -49,7 +49,7 @@ where
             .await
             .map_err(|e| DatabaseError::ConnectionError(e.to_string()))?;
 
-        Ok(Database { pool })
+        Ok(Self { pool })
     }
 
     /// Executes a query that returns a vector of the parsed results.
