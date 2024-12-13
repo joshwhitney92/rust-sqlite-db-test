@@ -16,7 +16,9 @@ async fn main() -> Result<(), Box<dyn Error>> {
     let repo = RemoteJobRepository::new();
     match repo.GetRemoteJobs().await {
         Ok(jobs) => {
-            jobs.iter().map(|job| println!("{:?}", job));
+            for job in jobs.iter() {
+                println!("{:?}", job)
+            }
         }
         Err(e) => {
             println!("Error: {:?}", e.to_string());
@@ -26,13 +28,13 @@ async fn main() -> Result<(), Box<dyn Error>> {
     println!("Using the Database abstraction");
     // TODO: Move this query to it's own file.
     let db_query = r#"
-                SELECT 
-                 PKRemoteJobs as RemoteJobID,
-                 Name,
-                 Url,
-                 FKCategory as Category
-                FROM RemoteJobs
-    "#;
+                 SELECT 
+                  PKRemoteJobs as RemoteJobID,
+                  Name,
+                  Url,
+                  FKCategory as Category
+                 FROM RemoteJobs
+     "#;
 
     let db: SqliteDatabase = Database::new(DB_PATH).await?;
     let remote_jobs: Vec<RemoteJob> = db.query(db_query).await?;
